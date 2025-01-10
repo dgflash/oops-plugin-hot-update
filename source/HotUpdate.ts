@@ -17,9 +17,39 @@ class HotUpdate {
     create(options: any) {
         if (!this.isEnable(options)) return;
 
-        this.init(options);
-        this.mainJs(options);
-        this.manifest(options);
+        switch (options.platform) {
+            case "wechatgame":
+                this.wechatgame(options)
+                break;
+            case "android":
+            case "ios":
+                this.init(options);
+                this.mainJs(options);
+                this.manifest(options);
+                break;
+        }
+    }
+
+    private wechatgame(options) {
+        var projectPath = Editor.Project.path;
+        var buildPath = `${options.buildPath.replace('project:/', projectPath)}/${options.outputName}`;
+        var hotUpdateAssetsPath = path.join(projectPath, storage);
+        this.mkdirSync(hotUpdateAssetsPath);
+
+        var platformPath = path.join(hotUpdateAssetsPath, options.outputName);
+        this.deleteDirSync(platformPath);
+        this.mkdirSync(platformPath);
+
+        // 构建后默认资源目录
+        var remote = 'remote';
+        var assetPath = remote;
+        var destPath = path.join(platformPath, assetPath);
+        assetPath = path.join(buildPath, assetPath);
+        Build.Utils.copyDirSync(assetPath, destPath);
+        console.log('[' + PACKAGE_NAME + '] Wechatgame 远程资源拷贝完成');
+
+        var projectRemotePath = path.join(buildPath, remote);
+        this.deleteDirSync(projectRemotePath);
     }
 
     private isEnable(options) {
@@ -107,67 +137,11 @@ class HotUpdate {
             assets: {},
         };
 
-        // 获取目录内所有文件
-        var listDir = (assetPath) => {
-            var fileList = [];
-            var stat = fs.statSync(assetPath);
-            if (stat.isDirectory()) {
-                var subpaths = fs.readdirSync(assetPath);
-                for (var i = 0; i < subpaths.length; i++) {
-                    var subpath = subpaths[i];
-                    if (subpath[0] === '.') {
-                        continue;
-                    }
-                    subpath = path.join(assetPath, subpath);
-                    fileList.push(...listDir(subpath));
-                }
-            }
-            else if (stat.isFile()) {
-                fileList.push({
-                    filePath: assetPath,
-                    size: stat.size,
-                });
-            }
-            return fileList;
-        };
-
-        // 创建目录
-        var mkdirSync = (dirName) => {
-            try {
-                fs.mkdirSync(dirName);
-            }
-            catch (e) {
-                if (e.code !== 'EEXIST')
-                    throw e;
-            }
-        };
-
-        // 递归删除目录及文件
-        var deleteDirSync = (dirName) => {
-            var files = [];
-            if (fs.existsSync(dirName)) {
-                // 返回文件和子目录的数组
-                files = fs.readdirSync(dirName);
-                files.forEach((file) => {
-                    var curPath = path.join(dirName, file);
-                    // 同步读取文件夹文件，如果是文件夹，在重复触发函数
-                    if (fs.statSync(curPath).isDirectory()) {
-                        deleteDirSync(curPath);
-                    }
-                    else {
-                        fs.unlinkSync(curPath);
-                    }
-                });
-
-                // 清除文件夹
-                fs.rmdirSync(dirName);
-            }
-        };
 
         // 迭代资源和源码文件夹
         var assetsList = [];
         assetsPaths.forEach((o) => {
-            assetsList.push(...listDir(path.join(assetsRootPath, o)));
+            assetsList.push(...this.listDir(path.join(assetsRootPath, o)));
         });
 
         // 填充 manifest.assets 对象
@@ -192,14 +166,14 @@ class HotUpdate {
 
         // 热更构建结果存储目录
         var hotUpdateAssetsPath = path.join(projectPath, storage);
-        mkdirSync(hotUpdateAssetsPath);
+        this.mkdirSync(hotUpdateAssetsPath);
         var manifestPath = path.join(hotUpdateAssetsPath, options.platform);
-        mkdirSync(manifestPath);
+        this.mkdirSync(manifestPath);
         hotUpdateAssetsPath = path.join(manifestPath, hotUpdateVersion);
-        mkdirSync(hotUpdateAssetsPath);
+        this.mkdirSync(hotUpdateAssetsPath);
 
         // 如果目录不为空, 先清除
-        deleteDirSync(hotUpdateAssetsPath);
+        this.deleteDirSync(hotUpdateAssetsPath);
 
         // 保存 project.manifest
         fs.writeFileSync(destManifestPath, JSON.stringify(manifest));
@@ -223,6 +197,64 @@ class HotUpdate {
             Build.Utils.copyDirSync(assetPath, destPath);
         });
         console.log('[' + PACKAGE_NAME + '] 资源拷贝完成');
+    }
+
+
+    // 获取目录内所有文件
+    private listDir(assetPath) {
+        var fileList = [];
+        var stat = fs.statSync(assetPath);
+        if (stat.isDirectory()) {
+            var subpaths = fs.readdirSync(assetPath);
+            for (var i = 0; i < subpaths.length; i++) {
+                var subpath = subpaths[i];
+                if (subpath[0] === '.') {
+                    continue;
+                }
+                subpath = path.join(assetPath, subpath);
+                fileList.push(...this.listDir(subpath));
+            }
+        }
+        else if (stat.isFile()) {
+            fileList.push({
+                filePath: assetPath,
+                size: stat.size,
+            });
+        }
+        return fileList;
+    }
+
+    // 创建目录
+    private mkdirSync(dirName) {
+        try {
+            fs.mkdirSync(dirName);
+        }
+        catch (e) {
+            if (e.code !== 'EEXIST')
+                throw e;
+        }
+    }
+
+    // 递归删除目录及文件
+    private deleteDirSync(dirName) {
+        var files = [];
+        if (fs.existsSync(dirName)) {
+            // 返回文件和子目录的数组
+            files = fs.readdirSync(dirName);
+            files.forEach((file) => {
+                var curPath = path.join(dirName, file);
+                // 同步读取文件夹文件，如果是文件夹，在重复触发函数
+                if (fs.statSync(curPath).isDirectory()) {
+                    this.deleteDirSync(curPath);
+                }
+                else {
+                    fs.unlinkSync(curPath);
+                }
+            });
+
+            // 清除文件夹
+            fs.rmdirSync(dirName);
+        }
     }
 }
 

@@ -53,8 +53,5 @@ export const onAfterMake: BuildHook.onAfterMake = async function (root, options)
 };
 
 export const onAfterBuild: BuildHook.onAfterBuild = async function (options, result) {
-    // hotUpdateInit(options);
-    // hotUpdateMainJs(options);
-    // hotUpdateManifest(options);
     hot.create(options);
 };
