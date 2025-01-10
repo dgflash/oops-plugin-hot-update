@@ -57,9 +57,6 @@ const onAfterMake = function (root, options) {
 exports.onAfterMake = onAfterMake;
 const onAfterBuild = function (options, result) {
     return __awaiter(this, void 0, void 0, function* () {
-        // hotUpdateInit(options);
-        // hotUpdateMainJs(options);
-        // hotUpdateManifest(options);
         HotUpdate_1.hot.create(options);
     });
 };
